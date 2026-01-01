@@ -111,5 +111,15 @@ async def main():
 
     await app.run_polling()
 
+# ===== Запуск с поддержкой Render =====
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        loop = asyncio.get_running_loop()
+        # Если уже есть активный event loop (Render), создаём задачу
+        loop.create_task(main())
+        # Держим процесс живым
+        while True:
+            time.sleep(1)
+    except RuntimeError:
+        # Локально можно использовать обычный asyncio.run
+        asyncio.run(main())
