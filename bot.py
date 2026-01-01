@@ -9,10 +9,10 @@ from telegram.ext import ApplicationBuilder, MessageHandler, ContextTypes, filte
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 # ===== Переменные окружения =====
-BOT_TOKEN = os.getenv("BOT_TOKEN")
+BOT_TOKEN = os.getenv("8573534227:AAEN4-SfbqohLk-Fd-Wbs7_8T95HQp1m-Wk")
 WEATHER_KEY = os.getenv("WEATHER_KEY")
 CITY = os.getenv("CITY", "Moscow")
-CHAT_ID = int(os.getenv("CHAT_ID"))
+CHAT_ID = int(os.getenv("-5084894998"))
 
 # ===== Юморные фразы =====
 PHOTO_REPLIES = [
