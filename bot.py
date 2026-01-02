@@ -71,14 +71,22 @@ async def hourly_job(context: ContextTypes.DEFAULT_TYPE):
 def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
+    # Хендлеры
     app.add_handler(MessageHandler(filters.PHOTO, on_photo))
     app.add_handler(MessageHandler(filters.VIDEO, on_video))
 
+    # Планировщик
     scheduler = AsyncIOScheduler()
-    scheduler.add_job(hourly_job, "interval", hours=1, args=[app.bot])
-    scheduler.start()
 
-    # PTB 22+ работает прямо с run_polling
+    # Запускаем планировщик после того, как loop будет создан
+    async def start_scheduler():
+        scheduler.add_job(hourly_job, "interval", hours=1, args=[app.bot])
+        scheduler.start()
+
+    # PTB 22+ позволяет создать background task
+    app.create_task(start_scheduler())
+
+    # Запуск polling
     app.run_polling()
 
 if __name__ == "__main__":
