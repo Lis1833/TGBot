@@ -75,16 +75,15 @@ def main():
     app.add_handler(MessageHandler(filters.PHOTO, on_photo))
     app.add_handler(MessageHandler(filters.VIDEO, on_video))
 
-    # Планировщик
+    # Создаем APScheduler
     scheduler = AsyncIOScheduler()
 
-    # Запускаем планировщик после того, как loop будет создан
-    async def start_scheduler():
+    # ===== Используем post_init, чтобы запускать внутри уже существующего loop =====
+    async def init_scheduler(app):
         scheduler.add_job(hourly_job, "interval", hours=1, args=[app.bot])
         scheduler.start()
 
-    # PTB 22+ позволяет создать background task
-    app.create_task(start_scheduler())
+    app.post_init(init_scheduler)
 
     # Запуск polling
     app.run_polling()
