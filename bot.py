@@ -11,7 +11,7 @@ import nest_asyncio
 BOT_TOKEN = "8573534227:AAEN4-SfbqohLk-Fd-Wbs7_8T95HQp1m-Wk"
 CHAT_ID = -5084894998
 
-# ===== ЮМОР =====
+# ===== ЮМОРНЫЕ ФРАЗЫ =====
 PHOTO_REPLIES = [
     "🖼 Так… это искусство или мем?",
     "😂 Картинка сказала больше, чем слова",
@@ -36,7 +36,7 @@ SUBREDDITS_RSS = [
 ]
 
 LAST_REPLY = 0
-COOLDOWN = 120
+COOLDOWN = 120  # секунд между ответами
 
 # ===== ФУНКЦИИ =====
 def can_reply():
@@ -62,6 +62,7 @@ async def on_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(random.choice(VIDEO_REPLIES))
 
 async def hourly_job(context: ContextTypes.DEFAULT_TYPE):
+    """Часовая задача: шутка или мем"""
     if random.choice([True, False]):
         meme = get_meme()
         if meme:
@@ -71,29 +72,32 @@ async def hourly_job(context: ContextTypes.DEFAULT_TYPE):
 
 # ===== ОСНОВНАЯ ФУНКЦИЯ =====
 async def main():
-    nest_asyncio.apply()  # нужен для Render
+    # Для Render, чтобы asyncio работал внутри существующего loop
+    nest_asyncio.apply()
+
+    # Создаём приложение бота
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
-    # ===== Добавляем обработчики =====
+    # Добавляем хендлеры для фото/видео
     app.add_handler(MessageHandler(filters.PHOTO, on_photo))
     app.add_handler(MessageHandler(filters.VIDEO, on_video))
 
-    # ===== Планировщик =====
+    # Планировщик APScheduler
     scheduler = AsyncIOScheduler()
 
     async def start_scheduler():
         scheduler.add_job(hourly_job, "interval", hours=1, args=[app.bot])
         scheduler.start()
 
-    # ===== Инициализация приложения =====
+    # Инициализация приложения
     await app.initialize()
 
-    # ===== Запуск планировщика в существующем loop =====
+    # Запуск планировщика в текущем loop
     app.create_task(start_scheduler())
 
-    # ===== Запуск polling =====
+    # Запуск polling (один экземпляр — без конфликтов)
     await app.run_polling()
 
-# ===== ЗАПУСК на Render =====
+# ===== ЗАПУСК =====
 if __name__ == "__main__":
     asyncio.run(main())
