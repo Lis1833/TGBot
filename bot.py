@@ -1,6 +1,7 @@
 import random
 import time
 import feedparser
+import asyncio
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, ContextTypes, filters
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -67,26 +68,32 @@ async def hourly_job(context: ContextTypes.DEFAULT_TYPE):
     else:
         await context.bot.send_message(CHAT_ID, random.choice(JOKES))
 
-# ===== ЗАПУСК =====
-def main():
+# ===== ОСНОВНАЯ ФУНКЦИЯ =====
+async def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
-    # Хендлеры
+    # ===== Добавляем обработчики =====
     app.add_handler(MessageHandler(filters.PHOTO, on_photo))
     app.add_handler(MessageHandler(filters.VIDEO, on_video))
 
-    # Создаем APScheduler
+    # ===== Планировщик =====
     scheduler = AsyncIOScheduler()
 
-    # ===== Используем post_init, чтобы запускать внутри уже существующего loop =====
-    async def init_scheduler(app):
+    async def start_scheduler():
         scheduler.add_job(hourly_job, "interval", hours=1, args=[app.bot])
         scheduler.start()
 
-    app.post_init(init_scheduler)
+    # ===== Инициализация приложения (создаёт loop) =====
+    await app.initialize()
 
-    # Запуск polling
-    app.run_polling()
+    # ===== Запускаем планировщик в уже существующем loop =====
+    app.create_task(start_scheduler())
 
+    # ===== Запуск polling =====
+    await app.run_polling()
+
+# ===== ЗАПУСК на Render =====
 if __name__ == "__main__":
-    main()
+    import nest_asyncio
+    nest_asyncio.apply()  # нужно для Render, чтобы asyncio работал корректно
+    asyncio.run(main())
