@@ -78,6 +78,7 @@ def main():
     scheduler.add_job(hourly_job, "interval", hours=1, args=[app.bot])
     scheduler.start()
 
+    # PTB 22+ работает прямо с run_polling
     app.run_polling()
 
 if __name__ == "__main__":
