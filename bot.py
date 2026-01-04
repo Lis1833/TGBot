@@ -1,125 +1,149 @@
+import os
 import random
 from datetime import datetime
-from zoneinfo import ZoneInfo
 
+import pytz
+from flask import Flask, request
 from telegram import Update
 from telegram.ext import (
     Application,
-    CommandHandler,
-    MessageHandler,
+    ApplicationBuilder,
     ContextTypes,
+    MessageHandler,
     filters,
 )
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 # ================== НАСТРОЙКИ ==================
+
 BOT_TOKEN = "8573534227:AAEN4-SfbqohLk-Fd-Wbs7_8T95HQp1m-Wk"
 CHAT_ID = -5084894998
 
-PORT = 8000
-BASE_URL = "https://<ТВОЙ-ПРОЕКТ>.up.railway.app"  # Railway подставит автоматически
+MOSCOW_TZ = pytz.timezone("Europe/Moscow")
 
-MOSCOW_TZ = ZoneInfo("Europe/Moscow")
+BASE_URL = os.environ.get("RAILWAY_STATIC_URL")
+WEBHOOK_PATH = f"/{BOT_TOKEN}"
+WEBHOOK_URL = f"{BASE_URL}{WEBHOOK_PATH}"
 
-# ================== ФРАЗЫ ==================
+# ================== ТЕКСТЫ ==================
+
 PHOTO_REPLIES = [
-    "📸 Вот это кадр!",
-    "🖼 Такое в музей надо",
-    "😂 Картинка сказала всё",
-    "👀 Интересно, интересно…",
-    "🎨 Художник внутри тебя жив",
-    "😏 Это точно без фотошопа?",
-    "📷 Скрин принят",
-    "🔥 Контент подъехал",
-    "🤔 И как это комментировать?",
-    "🤣 Чат оживился",
-    "😎 Неплохо, неплохо",
-    "🫠 Я не был к этому готов",
-    "📸 Сильное фото",
-    "👁‍🗨 Есть над чем подумать",
-    "😂 Ну всё, пошло-поехало",
-    "🖼 Сохраняю в историю",
-    "🤨 А что тут происходит?",
-    "📷 Вот это момент",
-    "😄 Красиво сыграно",
-    "🔥 Одобряю",
+    "📸 Ого, вот это кадр!",
+    "😂 Картинка огонь",
+    "🖼 Такое надо в рамку",
+    "👀 Я всё видел",
+    "😄 Чат одобряет",
+    "🔥 Это достойно лайка",
+    "🤣 Мемный потенциал",
+    "😏 Подозрительно смешно",
+    "📷 Фотка дня",
+    "😂 Сохраняю в память",
+    "🫠 Красиво пошло",
+    "🤌 Эстетика",
+    "😎 Хорош",
+    "🤡 Ну ты выдал",
+    "🖌 Искусство",
+    "📸 Скрин судьбы",
+    "😂 Улыбнуло",
+    "👁 Вижу, вижу",
+    "😆 Зачёт",
+    "🫡 Принято",
 ]
 
 VIDEO_REPLIES = [
-    "🎬 Ну всё, залипли",
-    "📹 Сейчас будет интересно",
+    "🎥 Ну всё, залипли",
     "😂 Видео решает",
-    "👀 Смотрим внимательно",
-    "🍿 Где попкорн?",
-    "🎥 Классика жанра",
-    "😅 Это было неожиданно",
-    "🔥 Контент уровня PRO",
-    "🤣 Вот это поворот",
-    "🎞 Почти кино",
-    "😎 Неплохой монтаж",
-    "🤯 Что я только что увидел?",
-    "📺 Продолжаем смотреть",
-    "😂 Ну ты даёшь",
-    "🎬 Сюжет закручивается",
-    "👁‍🗨 Это надо пересмотреть",
-    "🔥 Хорош!",
-    "😄 Чат оценил",
-    "📹 Сохраню на потом",
-    "🫣 Смело",
+    "🍿 Попкорн где?",
+    "👀 Сейчас будет экшн",
+    "🔥 Норм пошло",
+    "🤣 Это можно пересматривать",
+    "🎬 Режиссёр доволен",
+    "😏 Интрига",
+    "🫣 Опасно красиво",
+    "😄 Вот это движ",
+    "📹 Камера, мотор!",
+    "😂 Чистый контент",
+    "🤯 Неожиданно",
+    "😎 Сильная подача",
+    "🎞 Классика",
+    "🤣 Минутка кайфа",
+    "👁 Смотрю внимательно",
+    "🔥 Годно",
+    "😆 Хорошо зашло",
+    "🫡 Видео принято",
 ]
 
 SILENCE_MESSAGES = [
-    "🤔 Что-то в группе тишина…",
-    "😴 Такое чувство, что все ушли за кофе",
-    "📉 Давненько не было смешного контента",
-    "👀 Народ, вы где?",
+    "🤫 В группе подозрительная тишина…",
+    "😴 Давно не было смешного контента",
     "😂 Чат скучает по мемам",
-    "🫠 Неловкая пауза…",
-    "📢 Алё, приём!",
-    "😎 Может, кто-нибудь пошутит?",
+    "👀 Такое чувство, что все затаились",
+    "🫠 Народ, оживаем",
+    "☕ Все ушли за кофе?",
 ]
 
-# ================== ОБРАБОТЧИКИ ==================
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("🤖 Я на месте. Слежу за контентом 👀")
+# ================== HANDLERS ==================
 
 async def on_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if random.random() < 0.6:
-        await update.message.reply_text(random.choice(PHOTO_REPLIES))
+    await update.message.reply_text(random.choice(PHOTO_REPLIES))
+
 
 async def on_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if random.random() < 0.6:
-        await update.message.reply_text(random.choice(VIDEO_REPLIES))
+    await update.message.reply_text(random.choice(VIDEO_REPLIES))
 
-# ================== ПЕРИОДИЧЕСКИЕ ЗАДАЧИ ==================
-async def send_silence_message(context: ContextTypes.DEFAULT_TYPE):
-    await context.bot.send_message(
-        chat_id=CHAT_ID,
-        text=random.choice(SILENCE_MESSAGES)
-    )
 
-async def send_time_message(context: ContextTypes.DEFAULT_TYPE):
-    now = datetime.now(MOSCOW_TZ)
-    text = now.strftime("🕒 Москва: %d.%m.%Y — %H:%M")
-    await context.bot.send_message(chat_id=CHAT_ID, text=text)
+# ================== SCHEDULE ==================
 
-# ================== MAIN ==================
-def main():
-    app = Application.builder().token(BOT_TOKEN).build()
+async def send_silence(app: Application):
+    await app.bot.send_message(CHAT_ID, random.choice(SILENCE_MESSAGES))
 
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.PHOTO, on_photo))
-    app.add_handler(MessageHandler(filters.VIDEO, on_video))
 
-    job_queue = app.job_queue
-    job_queue.run_repeating(send_silence_message, interval=1800, first=1800)
-    job_queue.run_repeating(send_time_message, interval=3600, first=3600)
+async def send_time(app: Application):
+    now = datetime.now(MOSCOW_TZ).strftime("%d.%m.%Y %H:%M")
+    await app.bot.send_message(CHAT_ID, f"🕒 Сейчас в Москве: {now}")
 
-    app.run_webhook(
-        listen="0.0.0.0",
-        port=PORT,
-        url_path=BOT_TOKEN,
-        webhook_url=f"{BASE_URL}/{BOT_TOKEN}",
-    )
+
+async def post_init(app: Application):
+    scheduler = AsyncIOScheduler()
+    scheduler.add_job(send_silence, "interval", minutes=30, args=[app])
+    scheduler.add_job(send_time, "interval", hours=1, args=[app])
+    scheduler.start()
+
+    await app.bot.set_webhook(WEBHOOK_URL)
+
+
+# ================== TELEGRAM APP ==================
+
+telegram_app = (
+    ApplicationBuilder()
+    .token(BOT_TOKEN)
+    .post_init(post_init)
+    .build()
+)
+
+telegram_app.add_handler(MessageHandler(filters.PHOTO, on_photo))
+telegram_app.add_handler(MessageHandler(filters.VIDEO, on_video))
+
+# ================== FLASK ==================
+
+flask_app = Flask(__name__)
+
+@flask_app.post(WEBHOOK_PATH)
+async def telegram_webhook():
+    update = Update.de_json(request.get_json(force=True), telegram_app.bot)
+    await telegram_app.process_update(update)
+    return "OK"
+
+
+@flask_app.get("/")
+def health():
+    return "Bot is running"
+
+
+# ================== START ==================
 
 if __name__ == "__main__":
-    main()
+    flask_app.run(
+        host="0.0.0.0",
+        port=int(os.environ.get("PORT", 8000))
+    )
