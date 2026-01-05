@@ -1,117 +1,96 @@
-import os
-import random
-from datetime import datetime
-
-import pytz
 from flask import Flask, request
 from telegram import Update
-from telegram.ext import ApplicationBuilder, MessageHandler, filters
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from telegram.ext import (
+    Application,
+    MessageHandler,
+    CommandHandler,
+    ContextTypes,
+    filters,
+)
+from datetime import datetime
+from zoneinfo import ZoneInfo
+import random
+import asyncio
 
-# ================== НАСТРОЙКИ ==================
-
+# ====== НАСТРОЙКИ ======
 BOT_TOKEN = "8573534227:AAEN4-SfbqohLk-Fd-Wbs7_8T95HQp1m-Wk"
 CHAT_ID = -5084894998
+PORT = 8080
 
-MOSCOW_TZ = pytz.timezone("Europe/Moscow")
-
-# URL Railway для Webhook, должен быть задан как Environment Variable
-WEBHOOK_PATH = f"/{BOT_TOKEN}"
-
-# ================== ТЕКСТЫ ==================
-
+# ====== ФРАЗЫ ======
 PHOTO_REPLIES = [
-    "📸 Ого, вот это кадр!", "😂 Картинка огонь", "🖼 Такое надо в рамку",
-    "👀 Я всё видел", "😄 Чат одобряет", "🔥 Это достойно лайка",
-    "🤣 Мемный потенциал", "😏 Подозрительно смешно", "📷 Фотка дня",
-    "😂 Улыбнуло", "🫠 Красиво пошло", "🤌 Эстетика",
-    "😎 Хорош", "🤡 Ну ты выдал", "🖌 Искусство",
-    "📸 Скрин судьбы", "😂 Улыбнуло", "👁 Вижу, вижу",
-    "😆 Зачёт", "🫡 Принято"
+    "📸 Вот это кадр 😄",
+    "🖼 Скриншот эпохи",
+    "😂 Картинка засчитана",
+    "👀 А с этого места подробнее",
+    "🔥 Контент подъехал",
+    "🫠 Красота требует лайков",
 ]
 
 VIDEO_REPLIES = [
-    "🎥 Ну всё, залипли", "😂 Видео решает", "🍿 Попкорн где?",
-    "👀 Сейчас будет экшн", "🔥 Норм пошло", "🤣 Это можно пересматривать",
-    "🎬 Режиссёр доволен", "😏 Интрига", "🫣 Опасно красиво",
-    "😄 Вот это движ", "📹 Камера, мотор!", "😂 Чистый контент",
-    "🤯 Неожиданно", "😎 Сильная подача", "🎞 Классика",
-    "🤣 Минутка кайфа", "👁 Смотрю внимательно", "🔥 Годно",
-    "😆 Хорошо зашло", "🫡 Видео принято"
+    "🎬 Попкорн где?",
+    "😂 Видео — топ",
+    "📹 Сейчас будет интересно",
+    "👀 Смотрим всем чатом",
+    "🔥 Контент пошёл",
+    "🫣 Надеюсь без жести",
 ]
 
 SILENCE_MESSAGES = [
-    "🤫 В группе подозрительная тишина…", "😴 Давно не было смешного контента",
-    "😂 Чат скучает по мемам", "👀 Такое чувство, что все затаились",
-    "🫠 Народ, оживаем", "☕ Все ушли за кофе?"
+    "🤫 В чате тишина… где мемы?",
+    "😴 Чат уснул? Срочно смешное!",
+    "👀 Давненько тут не смеялись",
+    "📉 Уровень юмора падает",
+    "😂 Срочно нужен мем",
 ]
 
-# ================== HANDLERS ==================
+# ====== FLASK ======
+app = Flask(__name__)
 
-async def on_photo(update: Update, context):
-    await update.message.reply_text(random.choice(PHOTO_REPLIES))
+telegram_app = Application.builder().token(BOT_TOKEN).build()
 
-async def on_video(update: Update, context):
-    await update.message.reply_text(random.choice(VIDEO_REPLIES))
+# ====== HANDLERS ======
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("✅ Бот запущен и работает")
 
-# ================== SCHEDULE ==================
+async def on_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if random.random() < 0.5:
+        await update.message.reply_text(random.choice(PHOTO_REPLIES))
 
-async def send_silence(app):
-    await app.bot.send_message(CHAT_ID, random.choice(SILENCE_MESSAGES))
+async def on_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if random.random() < 0.5:
+        await update.message.reply_text(random.choice(VIDEO_REPLIES))
 
-async def send_time(app):
-    now = datetime.now(MOSCOW_TZ).strftime("%d.%m.%Y %H:%M")
-    await app.bot.send_message(CHAT_ID, f"🕒 Сейчас в Москве: {now}")
-
-# ================== POST INIT ==================
-
-async def post_init(app):
-    # ==== Шедулер ====
-    scheduler = AsyncIOScheduler()
-    scheduler.add_job(send_silence, "interval", minutes=30, args=[app])
-    scheduler.add_job(send_time, "interval", hours=1, args=[app])
-    scheduler.start()
-
-    # ==== Webhook ====
-    RAILWAY_URL = os.environ.get("RAILWAY_STATIC_URL")
-    if not RAILWAY_URL:
-        print("⚠️ Переменная RAILWAY_STATIC_URL не задана! Webhook не зарегистрирован.")
-        return
-
-    WEBHOOK_URL = f"{RAILWAY_URL}{WEBHOOK_PATH}"
-    result = await app.bot.set_webhook(WEBHOOK_URL)
-    if result:
-        print(f"✅ Webhook установлен на: {WEBHOOK_URL}")
-    else:
-        print("❌ Не удалось установить Webhook")
-
-# ================== TELEGRAM APP ==================
-
-telegram_app = (
-    ApplicationBuilder()
-    .token(BOT_TOKEN)
-    .post_init(post_init)
-    .build()
-)
-
+telegram_app.add_handler(CommandHandler("start", start))
 telegram_app.add_handler(MessageHandler(filters.PHOTO, on_photo))
 telegram_app.add_handler(MessageHandler(filters.VIDEO, on_video))
 
-# ================== FLASK ==================
+# ====== JOBS ======
+async def silence_job(context: ContextTypes.DEFAULT_TYPE):
+    await context.bot.send_message(
+        chat_id=CHAT_ID,
+        text=random.choice(SILENCE_MESSAGES),
+    )
 
-flask_app = Flask(__name__)
+async def time_job(context: ContextTypes.DEFAULT_TYPE):
+    now = datetime.now(ZoneInfo("Europe/Moscow"))
+    text = now.strftime("🕒 %d.%m.%Y — %H:%M (МСК)")
+    await context.bot.send_message(chat_id=CHAT_ID, text=text)
 
-@flask_app.post(WEBHOOK_PATH)
-async def telegram_webhook():
+telegram_app.job_queue.run_repeating(silence_job, interval=1800, first=1800)
+telegram_app.job_queue.run_repeating(time_job, interval=3600, first=3600)
+
+# ====== WEBHOOK ======
+@app.route("/webhook", methods=["POST"])
+def webhook():
     update = Update.de_json(request.get_json(force=True), telegram_app.bot)
-    await telegram_app.process_update(update)
-    return "OK"
+    asyncio.run(telegram_app.process_update(update))
+    return "ok"
 
-@flask_app.get("/")
-def health():
+@app.route("/")
+def index():
     return "Bot is running"
 
-# ================== START ==================
-
+# ====== START ======
 if __name__ == "__main__":
-    flask_app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8000)))
+    app.run(host="0.0.0.0", port=PORT)
