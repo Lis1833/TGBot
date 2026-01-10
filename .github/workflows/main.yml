@@ -1,6 +1,5 @@
 name: Telegram Bot
 
-# Запуск каждый пуш и каждые 5 минут
 on:
   push:
     branches:
@@ -13,28 +12,20 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Клонируем репозиторий
       - uses: actions/checkout@v3
 
-      # Устанавливаем Python
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: 3.10
 
-      # Устанавливаем зависимости
       - name: Install dependencies
-        run: pip install --upgrade pip
-      - run: pip install -r requirements.txt
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
-      # Запуск бота
       - name: Run Telegram Bot
         env:
-          BOT_TOKEN: ${{ secrets.8573534227:AAEN4-SfbqohLk-Fd-Wbs7_8T95HQp1m-Wk }}
-          CHAT_ID: ${{ secrets.-5084894998 }}
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
         run: python bot.py
-
-
-
-
-
